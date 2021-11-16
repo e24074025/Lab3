@@ -15,6 +15,20 @@ let currentDevice;
     /* PARAMS */
     const fs =500;
     const totalTime = 5;
+    let avg_coef_len = Math.floor(fs /60); // 60Hz
+    const coef = Array(avg_coef_len).fill(1/avg_coef_len);
+    const queue = Array(avg_coef_len).fill(0);
+
+    function movingAvg(dot, coef, flag) {
+        /* <- */
+        queue.shift();
+        queue.push(dot);
+
+        let tmp = 0;
+        queue.forEach((_, idx) => tmp += coef[idx] * queue[idx]);
+        return (flag)? tmp : dot;
+    }
+
 const timer = {
     timerFlag: 0,
     startTimer: function() {
@@ -107,10 +121,10 @@ function connect(dev) {
                     package.forEach(dot => {
                         currentTime++;
                         if(datas.length < points) {
-                            datas.push(dot*3.6/4096);
+                            datas.push(movingAvg(dot*3.6/4096, coef, isFilt));
                             times.push((currentTime/fs));
                         } else {
-                            datas = [dot*3.6/4096];
+                            datas = [movingAvg(dot*3.6/4096, coef, isFilt)];
                             times = [(currentTime/fs)];
                         }
                     });
