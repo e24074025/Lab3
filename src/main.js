@@ -4,9 +4,54 @@ $('.btn').click(ble);
 let currentDevice;
     let isPause = false;
     let isFilt = false;
-    const serviceUUID = '0000ff01-0000-1000-8000-00805f9b34fb';
-    const charUUID = '0000aa01-0000-1000-8000-00805f9b34fb';
+    const serviceUUID = '0000ff07-0000-1000-8000-00805f9b34fb';
+    const charUUID = '0000aa07-0000-1000-8000-00805f9b34fb';
     let package = [];
+    let datas = [];
+    let currentTime = 0;
+    let times = [];
+
+
+    /* PARAMS */
+    const fs =500;
+    const totalTime = 5;
+const timer = {
+    timerFlag: 0,
+    startTimer: function() {
+        this.timerFlag = setInterval(() => {
+            ECG.x = times;
+            ECG.y = datas;
+
+            const ctime = (currentTime-times.length) / fs;
+            layout.xaxis.range = [ctime, ctime + totalTime];
+
+            Plotly.redraw('chart');
+        }, 200); // update per 200ms
+    },
+    stopTimer: function() {
+        clearInterval(this.timerFlag);
+        this.timerFlag = 0;
+    }
+};
+
+    const points = fs*totalTime;
+    const ECG = {
+        x: times,
+        y: datas,
+        mode: 'lines',
+        name: 'ECG',
+        marker: {
+            color: 'blue',
+            size: 12
+        }
+    };
+    const layout = {
+        title: 'Real-time ECG signal',
+        xaxis: { range: [0, totalTime] },
+        yaxis: { range: [0, 5] }
+    };
+    
+    Plotly.newPlot('chart', [ECG], layout);
 function ble(evt) {
     console.log(evt.target.innerHTML, '被點擊')
     switch(evt.target.innerHTML) {
@@ -42,6 +87,8 @@ function scan() {
     }).catch(err => console.log('拋出錯誤內容: ', err));
 }
 function connect(dev) {
+    timer.startTimer();
+
     dev.gatt.connect().then(server => {
         console.log(server);
         return server.getPrimaryService(serviceUUID);
@@ -56,6 +103,17 @@ function connect(dev) {
                     package = Array.from(new Uint16Array(this.value.buffer));
                     $('#package-header')[0].innerHTML = 'Package點數: '+ package.length;
                     $('#package-body')[0].innerHTML = '[' + package + ']';
+
+                    package.forEach(dot => {
+                        currentTime++;
+                        if(datas.length < points) {
+                            datas.push(dot*3.6/4096);
+                            times.push((currentTime/fs));
+                        } else {
+                            datas = [dot*3.6/4096];
+                            times = [(currentTime/fs)];
+                        }
+                    });
                 }
             });
         });
@@ -65,4 +123,8 @@ function disconnect(dev) {
     dev.gatt.disconnect();
     console.log(dev.name, '已斷線');
     package =[];
+    datas = [];
+    currentTime = 0;
+    times = [];
+    timer.stopTimer();
 }
